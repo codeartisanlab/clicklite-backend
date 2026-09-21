@@ -1,8 +1,8 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
+from app.core.config import settings
 
-
-DATABASE_URL = "postgresql://surajkumar@localhost:5432/clicklite"
+DATABASE_URL = settings.DATABASE_URL
 
 
 engine = create_engine(
