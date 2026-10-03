@@ -5,6 +5,7 @@ from app.core.security import hash_password,verify_password,create_access_token,
 from app.db.database import get_db
 from app.models.user import User
 from app.schemas.auth import RegisterRequest, UserResponse,TokenResponse,LoginRequest
+from app.core.dependencies import get_current_user
 
 
 router = APIRouter(
@@ -103,46 +104,11 @@ def logout(response: Response):
     }
 
 @router.get("/me", response_model=UserResponse)
-def get_current_user(
-    access_token: str | None = Cookie(default=None),
-    db: Session = Depends(get_db),
+def get_me(
+    current_user: User = Depends(get_current_user),
 ):
-    if not access_token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated",
-        )
-
-    payload = decode_access_token(access_token)
-
-    if not payload:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token",
-        )
-
-    user_id = payload.get("sub")
-
-    if not user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token",
-        )
-
-    user = (
-        db.query(User)
-        .filter(User.id == user_id)
-        .first()
-    )
-
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found",
-        )
-
     return UserResponse(
-        id=str(user.id),
-        full_name=user.full_name,
-        email=user.email,
+        id=str(current_user.id),
+        full_name=current_user.full_name,
+        email=current_user.email,
     )
