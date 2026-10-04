@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status,HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_current_user
@@ -66,3 +66,34 @@ def get_workspaces(
         )
         for workspace in workspaces
     ]
+
+@router.get(
+    "/{workspace_id}",
+    response_model=WorkspaceResponse,
+)
+def get_workspace(
+    workspace_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    workspace = (
+        db.query(Workspace)
+        .filter(
+            Workspace.id == workspace_id,
+            Workspace.owner_id == current_user.id,
+        )
+        .first()
+    )
+
+    if not workspace:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Workspace not found",
+        )
+
+    return WorkspaceResponse(
+        id=str(workspace.id),
+        name=workspace.name,
+        color=workspace.color,
+        owner_id=str(workspace.owner_id),
+    )
