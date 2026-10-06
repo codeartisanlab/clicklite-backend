@@ -15,3 +15,4 @@ class ProjectResponse(BaseModel):
     name: str
     description: str | None
     workspace_id: str
+    workspace_name:str | None = None

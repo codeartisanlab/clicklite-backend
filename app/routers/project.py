@@ -14,7 +14,7 @@ router = APIRouter(
     tags=["Projects"],
 )
 
-
+# create new project
 @router.post(
     "",
     response_model=ProjectResponse,
@@ -133,3 +133,35 @@ def get_project(
         description=project.description,
         workspace_id=str(project.workspace_id),
     )
+
+# All project list
+@router.get(
+    "",
+    response_model=list[ProjectResponse],
+)
+def get_projects(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    projects = (
+        db.query(Project, Workspace)
+        .join(
+            Workspace,
+            Project.workspace_id == Workspace.id,
+        )
+        .filter(
+            Workspace.owner_id == current_user.id,
+        )
+        .all()
+    )
+
+    return [
+        ProjectResponse(
+            id=str(project.id),
+        name=project.name,
+        description=project.description,
+        workspace_id=str(workspace.id),
+        workspace_name=workspace.name
+        )
+        for project, workspace in projects
+    ]
