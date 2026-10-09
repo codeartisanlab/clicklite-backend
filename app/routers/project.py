@@ -131,7 +131,7 @@ def get_project(
         id=str(project.id),
         name=project.name,
         description=project.description,
-        workspace_id=str(project.workspace_id),
+        workspace_id=str(project.workspace_id)
     )
 
 # All project list
