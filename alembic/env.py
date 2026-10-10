@@ -23,6 +23,7 @@ from app.db.database import Base
 from app.models.user import User
 from app.models.workspace import Workspace
 from app.models.project import Project
+from app.models.task import Task
 
 target_metadata = Base.metadata
 
