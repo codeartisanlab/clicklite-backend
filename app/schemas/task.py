@@ -1,3 +1,5 @@
+from datetime import date
+
 from pydantic import BaseModel, Field
 
 
@@ -8,6 +10,7 @@ class TaskCreate(BaseModel):
     )
     description: str | None = None
     status: str = "todo"
+    due_date: date | None = None
 
 
 class TaskResponse(BaseModel):
@@ -15,4 +18,5 @@ class TaskResponse(BaseModel):
     title: str
     description: str | None
     status: str
+    due_date: date | None
     project_id: str

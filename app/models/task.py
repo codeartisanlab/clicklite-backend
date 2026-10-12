@@ -1,7 +1,7 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
-from sqlalchemy import DateTime, ForeignKey, String, Text
+from sqlalchemy import Date, DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.database import Base
@@ -29,6 +29,11 @@ class Task(Base):
         String(50),
         nullable=False,
         default="todo"
+    )
+
+    due_date: Mapped[date | None] = mapped_column(
+        Date,
+        nullable=True
     )
 
     project_id: Mapped[uuid.UUID] = mapped_column(

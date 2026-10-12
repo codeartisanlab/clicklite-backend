@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from datetime import date
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_current_user
@@ -10,23 +12,11 @@ from app.models.workspace import Workspace
 from app.schemas.task import TaskCreate, TaskResponse
 
 
-router = APIRouter(
-    prefix="/api/projects/{project_id}/tasks",
-    tags=["Tasks"],
-)
-
-
-@router.post(
-    "",
-    response_model=TaskResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-def create_task(
+def get_owned_project(
+    db: Session,
     project_id: str,
-    data: TaskCreate,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
+    current_user: User,
+) -> Project:
     project = (
         db.query(Project)
         .join(
@@ -46,10 +36,44 @@ def create_task(
             detail="Project not found",
         )
 
+    return project
+
+
+def to_task_response(task: Task) -> TaskResponse:
+    return TaskResponse(
+        id=str(task.id),
+        title=task.title,
+        description=task.description,
+        status=task.status,
+        due_date=task.due_date,
+        project_id=str(task.project_id),
+    )
+
+
+router = APIRouter(
+    prefix="/api/projects/{project_id}/tasks",
+    tags=["Tasks"],
+)
+
+
+@router.post(
+    "",
+    response_model=TaskResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_task(
+    project_id: str,
+    data: TaskCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    project = get_owned_project(db, project_id, current_user)
+
     task = Task(
         title=data.title,
         description=data.description,
         status=data.status,
+        due_date=data.due_date,
         project_id=project.id,
     )
 
@@ -57,10 +81,60 @@ def create_task(
     db.commit()
     db.refresh(task)
 
-    return TaskResponse(
-        id=str(task.id),
-        title=task.title,
-        description=task.description,
-        status=task.status,
-        project_id=str(task.project_id),
+    return to_task_response(task)
+
+
+@router.get(
+    "",
+    response_model=list[TaskResponse],
+)
+def get_tasks(
+    project_id: str,
+    due: bool = Query(default=False),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    project = get_owned_project(db, project_id, current_user)
+
+    tasks_query = db.query(Task).filter(Task.project_id == project.id)
+
+    if due:
+        tasks_query = tasks_query.filter(
+            Task.due_date.is_not(None),
+            Task.due_date <= date.today(),
+            Task.status != "done",
+        ).order_by(Task.due_date.asc())
+    else:
+        tasks_query = tasks_query.order_by(Task.created_at.desc())
+
+    return [to_task_response(task) for task in tasks_query.all()]
+
+
+@router.get(
+    "/{task_id}",
+    response_model=TaskResponse,
+)
+def get_task(
+    project_id: str,
+    task_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    project = get_owned_project(db, project_id, current_user)
+
+    task = (
+        db.query(Task)
+        .filter(
+            Task.id == task_id,
+            Task.project_id == project.id,
+        )
+        .first()
     )
+
+    if not task:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Task not found",
+        )
+
+    return to_task_response(task)
