@@ -9,7 +9,7 @@ from app.models.project import Project
 from app.models.task import Task
 from app.models.user import User
 from app.models.workspace import Workspace
-from app.schemas.task import TaskCreate, TaskResponse
+from app.schemas.task import TaskCreate, TaskResponse, TaskStatusUpdate
 
 
 def get_owned_project(
@@ -136,5 +136,40 @@ def get_task(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Task not found",
         )
+
+    return to_task_response(task)
+
+
+@router.patch(
+    "/{task_id}",
+    response_model=TaskResponse,
+)
+def update_task_status(
+    project_id: str,
+    task_id: str,
+    data: TaskStatusUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    project = get_owned_project(db, project_id, current_user)
+
+    task = (
+        db.query(Task)
+        .filter(
+            Task.id == task_id,
+            Task.project_id == project.id,
+        )
+        .first()
+    )
+
+    if not task:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Task not found",
+        )
+
+    task.status = data.status
+    db.commit()
+    db.refresh(task)
 
     return to_task_response(task)

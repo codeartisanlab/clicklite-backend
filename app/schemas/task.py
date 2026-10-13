@@ -1,5 +1,5 @@
 from datetime import date
-
+from typing import Literal
 from pydantic import BaseModel, Field
 
 
@@ -20,3 +20,6 @@ class TaskResponse(BaseModel):
     status: str
     due_date: date | None
     project_id: str
+
+class TaskStatusUpdate(BaseModel):
+    status: Literal["todo", "in_progress", "done"]
