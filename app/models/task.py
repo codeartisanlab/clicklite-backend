@@ -31,6 +31,17 @@ class Task(Base):
         default="todo"
     )
 
+    priority: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="medium"
+    )
+
+    assignee: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True
+    )
+
     due_date: Mapped[date | None] = mapped_column(
         Date,
         nullable=True
