@@ -9,7 +9,7 @@ from app.models.project import Project
 from app.models.task import Task
 from app.models.user import User
 from app.models.workspace import Workspace
-from app.schemas.task import TaskCreate, TaskResponse, TaskStatusUpdate
+from app.schemas.task import TaskCreate, TaskResponse, TaskUpdate
 
 
 def get_owned_project(
@@ -45,6 +45,8 @@ def to_task_response(task: Task) -> TaskResponse:
         title=task.title,
         description=task.description,
         status=task.status,
+        priority=task.priority,
+        assignee=task.assignee,
         due_date=task.due_date,
         project_id=str(task.project_id),
     )
@@ -73,6 +75,8 @@ def create_task(
         title=data.title,
         description=data.description,
         status=data.status,
+        priority=data.priority,
+        assignee=data.assignee,
         due_date=data.due_date,
         project_id=project.id,
     )
@@ -144,10 +148,10 @@ def get_task(
     "/{task_id}",
     response_model=TaskResponse,
 )
-def update_task_status(
+def update_task(
     project_id: str,
     task_id: str,
-    data: TaskStatusUpdate,
+    data: TaskUpdate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -168,7 +172,23 @@ def update_task_status(
             detail="Task not found",
         )
 
-    task.status = data.status
+    updates = data.model_dump(exclude_unset=True)
+
+    if "description" in updates:
+        task.description = updates["description"]
+
+    if "status" in updates:
+        task.status = updates["status"]
+
+    if "priority" in updates:
+        task.priority = updates["priority"]
+
+    if "assignee" in updates:
+        task.assignee = updates["assignee"]
+
+    if "due_date" in updates:
+        task.due_date = updates["due_date"]
+
     db.commit()
     db.refresh(task)
 
