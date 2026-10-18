@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date,datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -33,3 +33,4 @@ class TaskResponse(BaseModel):
     assignee: str | None
     due_date: date | None
     project_id: str
+    updated_at:datetime

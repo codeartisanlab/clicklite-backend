@@ -49,6 +49,7 @@ def to_task_response(task: Task) -> TaskResponse:
         assignee=task.assignee,
         due_date=task.due_date,
         project_id=str(task.project_id),
+        updated_at=task.updated_at,
     )
 
 
