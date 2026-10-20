@@ -34,3 +34,12 @@ class TaskResponse(BaseModel):
     due_date: date | None
     project_id: str
     updated_at:datetime
+
+
+class TaskCalendarResponse(BaseModel):
+    id: str
+    title: str
+    due_date: date
+    status: str
+    project_id: str
+    project_name: str

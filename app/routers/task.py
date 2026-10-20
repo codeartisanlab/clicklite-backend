@@ -9,7 +9,8 @@ from app.models.project import Project
 from app.models.task import Task
 from app.models.user import User
 from app.models.workspace import Workspace
-from app.schemas.task import TaskCreate, TaskResponse, TaskUpdate
+from app.schemas.task import TaskCreate, TaskResponse, TaskUpdate,TaskCalendarResponse
+
 
 
 def get_owned_project(
@@ -194,3 +195,42 @@ def update_task(
     db.refresh(task)
 
     return to_task_response(task)
+
+
+calendar_router = APIRouter(
+    prefix="/api/tasks",
+    tags=["Tasks"],
+)
+
+
+@calendar_router.get(
+    "",
+    response_model=list[TaskCalendarResponse],
+)
+def get_calendar_tasks(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    rows = (
+        db.query(Task, Project)
+        .join(Project, Task.project_id == Project.id)
+        .join(Workspace, Project.workspace_id == Workspace.id)
+        .filter(
+            Workspace.owner_id == current_user.id,
+            Task.due_date.is_not(None),
+        )
+        .order_by(Task.due_date.asc())
+        .all()
+    )
+
+    return [
+        TaskCalendarResponse(
+            id=str(task.id),
+            title=task.title,
+            due_date=task.due_date,
+            status=task.status,
+            project_id=str(project.id),
+            project_name=project.name,
+        )
+        for task, project in rows
+    ]
