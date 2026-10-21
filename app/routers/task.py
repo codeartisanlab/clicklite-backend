@@ -10,8 +10,7 @@ from app.models.task import Task
 from app.models.user import User
 from app.models.workspace import Workspace
 from app.schemas.task import TaskCreate, TaskResponse, TaskUpdate,TaskCalendarResponse
-
-
+from app.models.comment import Comment
 
 def get_owned_project(
     db: Session,
@@ -176,6 +175,9 @@ def update_task(
 
     updates = data.model_dump(exclude_unset=True)
 
+    if "title" in updates:
+        task.description = updates["title"].strip()
+
     if "description" in updates:
         task.description = updates["description"]
 
@@ -234,3 +236,43 @@ def get_calendar_tasks(
         )
         for task, project in rows
     ]
+
+
+@router.delete(
+    "/{task_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_task(
+    project_id: str,
+    task_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    project = get_owned_project(db, project_id, current_user)
+
+    task = (
+        db.query(Task)
+        .filter(
+            Task.id == task_id,
+            Task.project_id == project.id,
+        )
+        .first()
+    )
+
+    if not task:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Task not found",
+        )
+
+    comments = (
+        db.query(Comment)
+        .filter(Comment.task_id == task.id)
+        .all()
+    )
+
+    for comment in comments:
+        db.delete(comment)
+
+    db.delete(task)
+    db.commit()

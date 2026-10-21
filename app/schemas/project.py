@@ -10,6 +10,10 @@ class ProjectCreate(BaseModel):
     workspace_id: str
 
 
+class ProjectUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=2, max_length=100)
+    description: str | None = None
+
 class ProjectResponse(BaseModel):
     id: str
     name: str

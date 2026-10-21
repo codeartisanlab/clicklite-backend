@@ -12,6 +12,9 @@ class WorkspaceCreate(BaseModel):
         max_length=20
     )
 
+class WorkspaceUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=2, max_length=100)
+    color: str | None = Field(default=None, min_length=4, max_length=20)
 
 class WorkspaceResponse(BaseModel):
     id: str
