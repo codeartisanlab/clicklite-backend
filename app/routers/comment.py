@@ -8,6 +8,7 @@ from app.models.task import Task
 from app.models.user import User
 from app.routers.task import get_owned_project
 from app.schemas.comment import CommentCreate, CommentResponse
+from app.routers.notification import add_notification
 
 
 def get_owned_task(
@@ -99,6 +100,15 @@ def create_comment(
     )
 
     db.add(comment)
+
+    add_notification(
+        db,
+        user_id=current_user.id,
+        kind="comment",
+        message=f"New comment on {task.title}",
+        link=f"/projects/{project_id}/tasks/{task.id}",
+    )
+
     db.commit()
     db.refresh(comment)
 

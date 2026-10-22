@@ -11,6 +11,7 @@ from app.models.user import User
 from app.models.workspace import Workspace
 from app.schemas.task import TaskCreate, TaskResponse, TaskUpdate,TaskCalendarResponse
 from app.models.comment import Comment
+from app.routers.notification import add_notification
 
 def get_owned_project(
     db: Session,
@@ -83,6 +84,28 @@ def create_task(
     )
 
     db.add(task)
+    db.flush()
+
+    add_notification(
+        db,
+        user_id=current_user.id,
+        kind="task",
+        message=f"New task: {task.title}",
+        link=f"/projects/{project.id}/tasks/{task.id}",
+    )
+    if (
+        task.due_date is not None
+        and task.due_date <= date.today()
+        and task.status != "done"
+    ):
+        add_notification(
+            db,
+            user_id=current_user.id,
+            kind="due",
+            message=f"Task due: {task.title}",
+            link=f"/projects/{project.id}/tasks/{task.id}",
+        )
+
     db.commit()
     db.refresh(task)
 
@@ -192,6 +215,20 @@ def update_task(
 
     if "due_date" in updates:
         task.due_date = updates["due_date"]
+
+        if (
+            task.due_date is not None
+            and task.due_date <= date.today()
+            and task.status != "done"
+        ):
+            add_notification(
+                db,
+                user_id=current_user.id,
+                kind="due",
+                message=f"Task due: {task.title}",
+                link=f"/projects/{project.id}/tasks/{task.id}",
+            )
+
 
     db.commit()
     db.refresh(task)
