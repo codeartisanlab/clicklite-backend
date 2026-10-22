@@ -7,6 +7,7 @@ from app.routers.task import router as task_router
 from app.routers.comment import router as comment_router
 from app.routers.task import calendar_router
 from app.routers.member import router as member_router
+from app.routers.notification import router as notification_router
 
 
 app = FastAPI(
@@ -32,6 +33,7 @@ app.include_router(task_router)
 app.include_router(comment_router)
 app.include_router(calendar_router)
 app.include_router(member_router)
+app.include_router(notification_router)
 
 @app.get("/")
 def root():

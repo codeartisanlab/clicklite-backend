@@ -26,6 +26,7 @@ from app.models.project import Project
 from app.models.task import Task
 from app.models.comment import Comment
 from app.models.member import Member
+from app.models.notification import Notification
 
 target_metadata = Base.metadata
 
