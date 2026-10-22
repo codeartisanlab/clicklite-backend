@@ -4,10 +4,14 @@ from sqlalchemy.orm import Session
 from app.core.dependencies import get_current_user
 from app.db.database import get_db
 from app.models.user import User
+from app.models.project import Project
+from app.models.task import Task
+from app.models.comment import Comment
 from app.models.workspace import Workspace
 from app.schemas.workspace import (
     WorkspaceCreate,
     WorkspaceResponse,
+    WorkspaceUpdate
 )
 
 router = APIRouter(
@@ -97,3 +101,89 @@ def get_workspace(
         color=workspace.color,
         owner_id=str(workspace.owner_id),
     )
+
+@router.patch(
+    "/{workspace_id}",
+    response_model=WorkspaceResponse,
+)
+def update_workspace(
+    workspace_id: str,
+    data: WorkspaceUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    workspace = (
+        db.query(Workspace)
+        .filter(
+            Workspace.id == workspace_id,
+            Workspace.owner_id == current_user.id,
+        )
+        .first()
+    )
+
+    if not workspace:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Workspace not found",
+        )
+
+    updates = data.model_dump(exclude_unset=True)
+
+    if updates.get("name"):
+        workspace.name = updates["name"].strip()
+
+    if updates.get("color"):
+        workspace.color = updates["color"]
+
+    db.commit()
+    db.refresh(workspace)
+
+    return WorkspaceResponse(
+        id=str(workspace.id),
+        name=workspace.name,
+        color=workspace.color,
+        owner_id=str(workspace.owner_id),
+    )
+
+
+@router.delete(
+    "/{workspace_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_workspace(
+    workspace_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    workspace = (
+        db.query(Workspace)
+        .filter(
+            Workspace.id == workspace_id,
+            Workspace.owner_id == current_user.id,
+        )
+        .first()
+    )
+
+    if not workspace:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Workspace not found",
+        )
+
+    projects = db.query(Project).filter(Project.workspace_id == workspace.id).all()
+
+    for project in projects:
+        tasks = db.query(Task).filter(Task.project_id == project.id).all()
+
+        for task in tasks:
+            comments = db.query(Comment).filter(Comment.task_id == task.id).all()
+
+            for comment in comments:
+                db.delete(comment)
+
+            db.delete(task)
+
+        db.delete(project)
+
+    db.delete(workspace)
+    db.commit()

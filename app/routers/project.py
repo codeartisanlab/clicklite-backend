@@ -6,7 +6,9 @@ from app.db.database import get_db
 from app.models.user import User
 from app.models.workspace import Workspace
 from app.models.project import Project
-from app.schemas.project import ProjectCreate, ProjectResponse
+from app.models.task import Task
+from app.models.comment import Comment
+from app.schemas.project import ProjectCreate, ProjectResponse,ProjectUpdate
 
 
 router = APIRouter(
@@ -165,3 +167,87 @@ def get_projects(
         )
         for project, workspace in projects
     ]
+
+
+@router.patch(
+    "/detail/{project_id}",
+    response_model=ProjectResponse,
+)
+def update_project(
+    project_id: str,
+    data: ProjectUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    project = (
+        db.query(Project)
+        .join(Workspace, Project.workspace_id == Workspace.id)
+        .filter(
+            Project.id == project_id,
+            Workspace.owner_id == current_user.id,
+        )
+        .first()
+    )
+
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found",
+        )
+
+    updates = data.model_dump(exclude_unset=True)
+
+    if updates.get("name"):
+        project.name = updates["name"].strip()
+
+    if "description" in updates:
+        project.description = updates["description"]
+
+    db.commit()
+    db.refresh(project)
+
+    return ProjectResponse(
+        id=str(project.id),
+        name=project.name,
+        description=project.description,
+        workspace_id=str(project.workspace_id),
+    )
+
+
+@router.delete(
+    "/detail/{project_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_project(
+    project_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    project = (
+        db.query(Project)
+        .join(Workspace, Project.workspace_id == Workspace.id)
+        .filter(
+            Project.id == project_id,
+            Workspace.owner_id == current_user.id,
+        )
+        .first()
+    )
+
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found",
+        )
+
+    tasks = db.query(Task).filter(Task.project_id == project.id).all()
+
+    for task in tasks:
+        comments = db.query(Comment).filter(Comment.task_id == task.id).all()
+
+        for comment in comments:
+            db.delete(comment)
+
+        db.delete(task)
+
+    db.delete(project)
+    db.commit()
