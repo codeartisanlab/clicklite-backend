@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, EmailStr, Field
 
 # Register
@@ -18,6 +20,25 @@ class UserResponse(BaseModel):
     id: str
     full_name: str
     email: EmailStr
+    phone: str | None = None
+    bio: str | None = None
+    theme: str = "light"
+
+
+class ProfileUpdate(BaseModel):
+    full_name: str = Field(
+        min_length=2,
+        max_length=100
+    )
+    phone: str | None = Field(
+        default=None,
+        max_length=20
+    )
+    bio: str | None = Field(
+        default=None,
+        max_length=500
+    )
+    theme: Literal["light", "dark"] = "light"
 
 
 # Login

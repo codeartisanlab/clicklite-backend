@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.core.security import hash_password,verify_password,create_access_token,decode_access_token
 from app.db.database import get_db
 from app.models.user import User
-from app.schemas.auth import RegisterRequest, UserResponse,TokenResponse,LoginRequest
+from app.schemas.auth import RegisterRequest, UserResponse,TokenResponse,LoginRequest,ProfileUpdate
 from app.core.dependencies import get_current_user
 
 
@@ -12,6 +12,17 @@ router = APIRouter(
     prefix="/api/auth",
     tags=["Authentication"]
 )
+
+
+def to_user_response(user: User) -> UserResponse:
+    return UserResponse(
+        id=str(user.id),
+        full_name=user.full_name,
+        email=user.email,
+        phone=user.phone,
+        bio=user.bio,
+        theme=user.theme or "light",
+    )
 
 
 @router.post(
@@ -47,11 +58,7 @@ def register(
     db.commit()
     db.refresh(user)
 
-    return UserResponse(
-        id=str(user.id),
-        full_name=user.full_name,
-        email=user.email
-    )
+    return to_user_response(user)
 
 
 # Login
@@ -107,8 +114,29 @@ def logout(response: Response):
 def get_me(
     current_user: User = Depends(get_current_user),
 ):
-    return UserResponse(
-        id=str(current_user.id),
-        full_name=current_user.full_name,
-        email=current_user.email,
-    )
+    return to_user_response(current_user)
+
+
+@router.patch("/me", response_model=UserResponse)
+def update_me(
+    data: ProfileUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    full_name = data.full_name.strip()
+
+    if len(full_name) < 2:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Name must be at least 2 characters",
+        )
+
+    current_user.full_name = full_name
+    current_user.phone = data.phone.strip() if data.phone and data.phone.strip() else None
+    current_user.bio = data.bio.strip() if data.bio and data.bio.strip() else None
+    current_user.theme = data.theme
+
+    db.commit()
+    db.refresh(current_user)
+
+    return to_user_response(current_user)
