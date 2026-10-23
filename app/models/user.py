@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import String, Boolean, DateTime
+from sqlalchemy import String, Boolean, DateTime,Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.database import Base
@@ -25,6 +25,21 @@ class User(Base):
         unique=True,
         index=True,
         nullable=False
+    )
+
+    phone: Mapped[str | None] = mapped_column(
+        String(20),
+        nullable=True
+    )
+
+    bio: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True
+    )
+
+    theme: Mapped[str | None] = mapped_column(
+        String(10),
+        nullable=True
     )
 
     password_hash: Mapped[str] = mapped_column(
