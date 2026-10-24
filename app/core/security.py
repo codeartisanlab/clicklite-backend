@@ -1,9 +1,17 @@
 from argon2 import PasswordHasher
 from datetime import datetime,timedelta,timezone
 from app.core.config import settings
-import jwt
+import jwt,secrets,hashlib
 
 password_hasher = PasswordHasher()
+
+
+def create_reset_token() -> str:
+    return secrets.token_urlsafe(32)
+
+
+def hash_reset_token(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
 
 
 def hash_password(password: str) -> str:

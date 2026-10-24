@@ -27,6 +27,7 @@ from app.models.task import Task
 from app.models.comment import Comment
 from app.models.member import Member
 from app.models.notification import Notification
+from app.models.password_reset import PasswordReset
 
 target_metadata = Base.metadata
 
