@@ -10,7 +10,7 @@ class TaskCreate(BaseModel):
         max_length=200
     )
     description: str | None = None
-    status: str = "todo"
+    status: Literal["todo", "in_progress", "done"] = "todo"
     priority: Literal["low", "medium", "high"] = "medium"
     assignee: str | None = None
     due_date: date | None = None

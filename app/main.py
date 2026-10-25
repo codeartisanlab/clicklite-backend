@@ -1,4 +1,7 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers.auth import router as auth_router
 from app.routers.workspace import router as workspace_router
@@ -16,6 +19,21 @@ app = FastAPI(
     description="API for ClickLite project management system",
     version="1.0.0",
 )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(
+    request: Request,
+    exc: RequestValidationError,
+):
+    error = exc.errors()[0]
+    field = error["loc"][-1]
+    reason = error["msg"]
+
+    return JSONResponse(
+        status_code=422,
+        content={"detail": f"{field}: {reason}"},
+    )
 
 app.add_middleware(
     CORSMiddleware,

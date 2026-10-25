@@ -65,11 +65,44 @@ def register(
     return to_user_response(user)
 
 
+
+failed_tries: dict[str, list[datetime]] = {}
+
+def too_many_tries(email: str) -> bool:
+    now = datetime.now(timezone.utc)
+    kept = []
+
+    for tried_at in failed_tries.get(email, []):
+        if now - tried_at < timedelta(minutes=15):
+            kept.append(tried_at)
+
+    failed_tries[email] = kept
+    return len(kept) >= 5
+
+
+def remember_failed_try(email: str) -> None:
+    if email not in failed_tries:
+        failed_tries[email] = []
+
+    failed_tries[email].append(datetime.now(timezone.utc))
+
+
+def forget_failed_tries(email: str) -> None:
+    if email in failed_tries:
+        del failed_tries[email]
+
+
 # Login
 @router.post(
     "/login"
 )
-def login(data: LoginRequest,response:Response, db: Session = Depends(get_db)):
+def login(data: LoginRequest, response: Response, db: Session = Depends(get_db)):
+    if too_many_tries(data.email):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many login attempts. Try again in 15 minutes.",
+        )
+
     user = (
         db.query(User)
         .filter(User.email == data.email)
@@ -77,16 +110,20 @@ def login(data: LoginRequest,response:Response, db: Session = Depends(get_db)):
     )
 
     if not user:
+        remember_failed_try(data.email)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
         )
 
     if not verify_password(data.password, user.password_hash):
+        remember_failed_try(data.email)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
         )
+
+    forget_failed_tries(data.email)
 
     access_token = create_access_token(str(user.id))
 
@@ -95,8 +132,8 @@ def login(data: LoginRequest,response:Response, db: Session = Depends(get_db)):
         value=access_token,
         httponly=True,
         samesite="lax",
-        secure=False,
-        max_age=60 * 60,
+        secure=settings.COOKIE_SECURE,
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         path="/",
     )
 
