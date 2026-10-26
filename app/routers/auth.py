@@ -5,7 +5,7 @@ from app.core.security import hash_password,verify_password,create_access_token,
 from app.db.database import get_db
 from app.models.user import User
 from app.models.password_reset import PasswordReset
-from app.schemas.auth import RegisterRequest, UserResponse,TokenResponse,LoginRequest,ProfileUpdate,ForgotPasswordRequest,ResetPasswordRequest
+from app.schemas.auth import RegisterRequest, UserResponse,TokenResponse,LoginRequest,ProfileUpdate,ForgotPasswordRequest,ResetPasswordRequest,PasswordChange
 from app.core.dependencies import get_current_user
 from app.core.email import send_reset_email
 from app.core.config import settings
@@ -270,3 +270,28 @@ def reset_password(
     return {
         "message": "Password updated"
     }
+
+
+
+@router.post("/change-password")
+def change_password(
+    data: PasswordChange,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if not verify_password(data.current_password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is wrong",
+        )
+
+    if data.current_password == data.new_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Choose a different password",
+        )
+
+    current_user.password_hash = hash_password(data.new_password)
+    db.commit()
+
+    return {"message": "Password updated"}
