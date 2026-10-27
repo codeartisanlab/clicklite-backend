@@ -6,8 +6,14 @@ from app.db.database import get_db
 from app.models.user import User
 
 from app.models.member import Member
+from app.models.workspace_invites import WorkspaceInvite
 from app.models.workspace import Workspace
-from app.schemas.member import MemberCreate, MemberResponse
+from app.schemas.member import MemberCreate, MemberResponse,InviteAccept
+
+from app.core.email import send_invite_email
+from app.core.config import settings
+from datetime import timedelta,datetime,timezone
+from app.core.security import hash_reset_token,create_reset_token
 
 router = APIRouter(
     prefix="/api/workspaces",
@@ -68,9 +74,9 @@ def get_members(
     return members
 
 
+# Send workspace Invitation
 @router.post(
     "/{workspace_id}/members",
-    response_model=MemberResponse,
     status_code=status.HTTP_201_CREATED,
 )
 def invite_member(
@@ -94,52 +100,119 @@ def invite_member(
             detail="Workspace not found",
         )
 
-    invited_user = (
-        db.query(User)
-        .filter(User.email == data.email.strip().lower())
-        .first()
-    )
+    email = data.email.strip().lower()
 
-    if not invited_user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No account with that email",
-        )
-
-    if invited_user.id == workspace.owner_id:
+    if email == current_user.email.strip().lower():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="This user is already the owner",
         )
 
+    invited_user = db.query(User).filter(User.email == email).first()
+
+    if invited_user is not None:
+        existing = (
+            db.query(Member)
+            .filter(
+                Member.workspace_id == workspace.id,
+                Member.user_id == invited_user.id,
+            )
+            .first()
+        )
+
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Already a member",
+            )
+
+    now = datetime.now(timezone.utc)
+    old_invites = (
+        db.query(WorkspaceInvite)
+        .filter(
+            WorkspaceInvite.workspace_id == workspace.id,
+            WorkspaceInvite.email == email,
+            WorkspaceInvite.used_at.is_(None),
+        )
+        .all()
+    )
+
+    for old_invite in old_invites:
+        old_invite.used_at = now
+
+    raw_token = create_reset_token()
+    invite = WorkspaceInvite(
+        workspace_id=workspace.id,
+        email=email,
+        role=data.role.strip(),
+        token_hash=hash_reset_token(raw_token),
+        expires_at=now + timedelta(days=7),
+    )
+
+    db.add(invite)
+    db.commit()
+
+    invite_url = f"{settings.FRONTEND_URL}/invite?token={raw_token}"
+    send_invite_email(email, invite_url)
+
+    return {"message": "Invitation sent"}
+
+
+invite_router = APIRouter(
+    prefix="/api/invites",
+    tags=["Invites"],
+)
+
+# Accept the invitation
+@invite_router.post("/accept")
+def accept_invite(
+    data: InviteAccept,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    invite = (
+        db.query(WorkspaceInvite)
+        .filter(WorkspaceInvite.token_hash == hash_reset_token(data.token))
+        .first()
+    )
+
+    now = datetime.now(timezone.utc)
+
+    if (
+        invite is None
+        or invite.used_at is not None
+        or invite.expires_at < now
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This invitation is invalid or expired",
+        )
+
+    if current_user.email.strip().lower() != invite.email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Log in with the invited email",
+        )
+
     existing = (
         db.query(Member)
         .filter(
-            Member.workspace_id == workspace.id,
-            Member.user_id == invited_user.id,
+            Member.workspace_id == invite.workspace_id,
+            Member.user_id == current_user.id,
         )
         .first()
     )
 
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Already a member",
+    if existing is None:
+        db.add(
+            Member(
+                workspace_id=invite.workspace_id,
+                user_id=current_user.id,
+                role=invite.role,
+            )
         )
 
-    member = Member(
-        workspace_id=workspace.id,
-        user_id=invited_user.id,
-        role=data.role.strip(),
-    )
-
-    db.add(member)
+    invite.used_at = now
     db.commit()
-    db.refresh(member)
 
-    return MemberResponse(
-        id=str(member.id),
-        full_name=invited_user.full_name,
-        email=invited_user.email,
-        role=member.role,
-    )
+    return {"message": "You joined the workspace"}

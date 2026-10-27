@@ -28,6 +28,7 @@ from app.models.comment import Comment
 from app.models.member import Member
 from app.models.notification import Notification
 from app.models.password_reset import PasswordReset
+from app.models.workspace_invites import WorkspaceInvite
 
 target_metadata = Base.metadata
 

@@ -11,3 +11,6 @@ class MemberResponse(BaseModel):
     full_name: str
     email: str
     role: str
+
+class InviteAccept(BaseModel):
+    token: str = Field(min_length=20)
