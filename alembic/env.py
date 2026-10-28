@@ -29,6 +29,7 @@ from app.models.member import Member
 from app.models.notification import Notification
 from app.models.password_reset import PasswordReset
 from app.models.workspace_invites import WorkspaceInvite
+from app.models.activity import Activity
 
 target_metadata = Base.metadata
 

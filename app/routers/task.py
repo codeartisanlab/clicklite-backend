@@ -15,6 +15,7 @@ from app.schemas.task import TaskCreate, TaskResponse, TaskUpdate,TaskCalendarRe
 from app.models.comment import Comment
 from app.routers.notification import add_notification
 from app.routers.workspace import can_access_workspace
+from app.routers.activity import add_activity
 
 def get_owned_project(
     db: Session,
@@ -97,6 +98,16 @@ def create_task(
             message=f"Task due: {task.title}",
             link=f"/projects/{project.id}/tasks/{task.id}",
         )
+
+    
+    add_activity(
+        db,
+        workspace_id=project.workspace_id,
+        user_id=current_user.id,
+        kind="task",
+        message=f"Created {task.title}",
+        link=f"/projects/{project.id}/tasks/{task.id}",
+    )
 
     db.commit()
     db.refresh(task)
@@ -197,7 +208,17 @@ def update_task(
         task.description = updates["description"]
 
     if "status" in updates:
+        status_changed = updates["status"] != task.status
         task.status = updates["status"]
+        if status_changed:
+            add_activity(
+                db,
+                workspace_id=project.workspace_id,
+                user_id=current_user.id,
+                kind="status",
+                message=f"Moved {task.title} to {task.status.replace('_', ' ')}",
+                link=f"/projects/{project.id}/tasks/{task.id}",
+            )
 
     if "priority" in updates:
         task.priority = updates["priority"]

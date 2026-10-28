@@ -5,10 +5,12 @@ from app.core.dependencies import get_current_user
 from app.db.database import get_db
 from app.models.comment import Comment
 from app.models.task import Task
+from app.models.project import Project
 from app.models.user import User
 from app.routers.task import get_owned_project
 from app.schemas.comment import CommentCreate, CommentResponse
 from app.routers.notification import add_notification
+from app.routers.activity import add_activity
 
 
 def get_owned_task(
@@ -107,6 +109,16 @@ def create_comment(
         kind="comment",
         message=f"New comment on {task.title}",
         link=f"/projects/{project_id}/tasks/{task.id}",
+    )
+
+    project = db.query(Project).filter(Project.id == task.project_id).first()
+    add_activity(
+        db,
+        workspace_id=project.workspace_id,
+        user_id=current_user.id,
+        kind="comment",
+        message=f"Commented on {task.title}",
+        link=f"/projects/{project.id}/tasks/{task.id}",
     )
 
     db.commit()

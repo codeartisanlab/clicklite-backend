@@ -8,6 +8,7 @@ from app.models.member import Member
 from app.models.project import Project
 from app.models.task import Task
 from app.models.comment import Comment
+from app.models.activity import Activity
 from app.models.workspace import Workspace
 from app.schemas.workspace import (
     WorkspaceCreate,
@@ -225,6 +226,11 @@ def delete_workspace(
             db.delete(task)
 
         db.delete(project)
+
+    
+    activities = db.query(Activity).filter(Activity.workspace_id == workspace.id).all()
+    for activity in activities:
+        db.delete(activity)
 
     db.delete(workspace)
     db.commit()
