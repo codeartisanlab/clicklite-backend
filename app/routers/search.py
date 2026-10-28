@@ -7,7 +7,9 @@ from app.models.project import Project
 from app.models.task import Task
 from app.models.user import User
 from app.models.workspace import Workspace
+from app.models.member import Member
 from app.schemas.search import SearchProject, SearchResponse, SearchTask
+from sqlalchemy import or_
 
 router = APIRouter(
     prefix="/api/search",
@@ -27,7 +29,14 @@ def search(
         db.query(Project, Workspace)
         .join(Workspace, Project.workspace_id == Workspace.id)
         .filter(
-            Workspace.owner_id == current_user.id,
+            or_(
+                Workspace.owner_id == current_user.id,
+                Workspace.id.in_(
+                    db.query(Member.workspace_id).filter(
+                        Member.user_id == current_user.id
+                    )
+                ),
+            ),
             Project.name.ilike(term),
         )
         .order_by(Project.name)
@@ -40,7 +49,14 @@ def search(
         .join(Project, Task.project_id == Project.id)
         .join(Workspace, Project.workspace_id == Workspace.id)
         .filter(
-            Workspace.owner_id == current_user.id,
+            or_(
+                Workspace.owner_id == current_user.id,
+                Workspace.id.in_(
+                    db.query(Member.workspace_id).filter(
+                        Member.user_id == current_user.id
+                    )
+                ),
+            ),
             Task.title.ilike(term),
         )
         .order_by(Task.title)

@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 
 from app.core.dependencies import get_current_user
 from app.db.database import get_db
@@ -7,8 +8,10 @@ from app.models.user import User
 from app.models.workspace import Workspace
 from app.models.project import Project
 from app.models.task import Task
+from app.models.member import Member
 from app.models.comment import Comment
 from app.schemas.project import ProjectCreate, ProjectResponse,ProjectUpdate
+from app.routers.workspace import can_access_workspace
 
 
 router = APIRouter(
@@ -69,14 +72,7 @@ def get_projects(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    workspace = (
-        db.query(Workspace)
-        .filter(
-            Workspace.id == workspace_id,
-            Workspace.owner_id == current_user.id,
-        )
-        .first()
-    )
+    workspace = can_access_workspace(db, workspace_id, current_user)
 
     if not workspace:
         raise HTTPException(
@@ -110,20 +106,9 @@ def get_project(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    project = (
-        db.query(Project)
-        .join(
-            Workspace,
-            Project.workspace_id == Workspace.id,
-        )
-        .filter(
-            Project.id == project_id,
-            Workspace.owner_id == current_user.id,
-        )
-        .first()
-    )
+    project = db.query(Project).filter(Project.id == project_id).first()
 
-    if not project:
+    if project is None or can_access_workspace(db, project.workspace_id, current_user) is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Project not found",
@@ -152,7 +137,14 @@ def get_projects(
             Project.workspace_id == Workspace.id,
         )
         .filter(
-            Workspace.owner_id == current_user.id,
+            or_(
+                Workspace.owner_id == current_user.id,
+                Workspace.id.in_(
+                    db.query(Member.workspace_id).filter(
+                        Member.user_id == current_user.id
+                    )
+                ),
+            )
         )
         .all()
     )
