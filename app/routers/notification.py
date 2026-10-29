@@ -10,6 +10,24 @@ from app.models.user import User
 from app.schemas.notification import NotificationResponse, ReadAllResponse
 
 
+import asyncio
+from fastapi import WebSocket, WebSocketDisconnect
+from app.core.security import decode_access_token
+
+sockets: dict[str, set[WebSocket]] = {}
+main_loop: asyncio.AbstractEventLoop | None = None
+
+def push_notification(user_id, payload) -> None:
+    if main_loop is None:
+        return
+    message = payload.model_dump(mode="json")
+    for socket in list(sockets.get(str(user_id), set())):
+        asyncio.run_coroutine_threadsafe(
+            socket.send_json(message),
+            main_loop,
+        )
+
+
 def add_notification(
     db: Session,
     user_id: uuid.UUID,
@@ -17,15 +35,17 @@ def add_notification(
     message: str,
     link: str,
 ) -> None:
-    db.add(
-        Notification(
+    notification=Notification(
             user_id=user_id,
             kind=kind,
             message=message,
             link=link,
             is_read=False,
         )
-    )
+
+    db.add(notification)
+    db.flush()
+    push_notification(user_id, to_notification_response(notification))
 
 
 def to_notification_response(notification: Notification) -> NotificationResponse:
@@ -43,6 +63,31 @@ router = APIRouter(
     prefix="/api/notifications",
     tags=["Notifications"],
 )
+
+
+@router.websocket("/ws")
+async def notifications_socket(websocket: WebSocket):
+    global main_loop
+    main_loop = asyncio.get_running_loop()
+
+    token = websocket.cookies.get("access_token")
+    payload = decode_access_token(token) if token else None
+    user_id = payload.get("sub") if payload else None
+
+    if not user_id:
+        await websocket.close(code=1008)
+        return
+
+    await websocket.accept()
+
+    room = sockets.setdefault(str(user_id), set())
+    room.add(websocket)
+
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        room.discard(websocket)
 
 
 @router.get(
