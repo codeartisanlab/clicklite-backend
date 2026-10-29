@@ -47,6 +47,11 @@ class Task(Base):
         nullable=True
     )
 
+    label: Mapped[str | None] = mapped_column(
+        String(20),
+        nullable=True,
+    )
+
     project_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("projects.id"),
         nullable=False,

@@ -14,6 +14,7 @@ class TaskCreate(BaseModel):
     priority: Literal["low", "medium", "high"] = "medium"
     assignee: str | None = None
     due_date: date | None = None
+    label: Literal["bug", "feature", "design"] | None = None
 
 
 class TaskUpdate(BaseModel):
@@ -27,6 +28,7 @@ class TaskUpdate(BaseModel):
     priority: Literal["low", "medium", "high"] | None = None
     assignee: str | None = None
     due_date: date | None = None
+    label: Literal["bug", "feature", "design"] | None = None
 
 
 class TaskResponse(BaseModel):
@@ -39,6 +41,7 @@ class TaskResponse(BaseModel):
     due_date: date | None
     project_id: str
     updated_at:datetime
+    label: str | None
 
 
 class TaskCalendarResponse(BaseModel):

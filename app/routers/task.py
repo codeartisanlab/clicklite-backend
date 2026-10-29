@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date,timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
@@ -42,6 +42,7 @@ def to_task_response(task: Task) -> TaskResponse:
         priority=task.priority,
         assignee=task.assignee,
         due_date=task.due_date,
+        label=task.label,
         project_id=str(task.project_id),
         updated_at=task.updated_at,
     )
@@ -73,6 +74,7 @@ def create_task(
         priority=data.priority,
         assignee=data.assignee,
         due_date=data.due_date,
+        label=data.label,
         project_id=project.id,
     )
 
@@ -122,6 +124,11 @@ def create_task(
 def get_tasks(
     project_id: str,
     due: bool = Query(default=False),
+    week: bool = Query(default=False),
+    status_filter: str | None = Query(default=None, alias="status"),
+    priority_filter: str | None = Query(default=None, alias="priority"),
+    label_filter: str | None = Query(default=None, alias="label"),
+    assignee_filter: str | None = Query(default=None, alias="assignee"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -129,12 +136,39 @@ def get_tasks(
 
     tasks_query = db.query(Task).filter(Task.project_id == project.id)
 
+    if status_filter:
+        tasks_query = tasks_query.filter(Task.status == status_filter)
+
+    if priority_filter:
+        tasks_query = tasks_query.filter(Task.priority == priority_filter)
+
+    if label_filter:
+        tasks_query = tasks_query.filter(Task.label == label_filter)
+
+    if assignee_filter and assignee_filter.strip():
+        tasks_query = tasks_query.filter(
+            Task.assignee.ilike(f"%{assignee_filter.strip()}%")
+        )
+
     if due:
         tasks_query = tasks_query.filter(
             Task.due_date.is_not(None),
             Task.due_date <= date.today(),
             Task.status != "done",
-        ).order_by(Task.due_date.asc())
+        )
+
+    if week:
+        today = date.today()
+        monday = today - timedelta(days=today.weekday())
+        sunday = monday + timedelta(days=6)
+        tasks_query = tasks_query.filter(
+            Task.due_date.is_not(None),
+            Task.due_date >= monday,
+            Task.due_date <= sunday,
+        )
+
+    if due or week:
+        tasks_query = tasks_query.order_by(Task.due_date.asc())
     else:
         tasks_query = tasks_query.order_by(Task.created_at.desc())
 
@@ -203,6 +237,9 @@ def update_task(
 
     if "title" in updates:
         task.description = updates["title"].strip()
+
+    if "label" in updates:
+        task.label = updates["label"]
 
     if "description" in updates:
         task.description = updates["description"]
