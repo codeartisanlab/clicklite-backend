@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     FRONTEND_URL: str = "http://localhost:3000"
     COOKIE_SECURE: bool = False
+    GROQ_API_KEY: str = ""
     model_config = SettingsConfigDict(env_file=".env")
 
 

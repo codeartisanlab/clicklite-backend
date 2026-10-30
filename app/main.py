@@ -14,6 +14,7 @@ from app.routers.notification import router as notification_router
 from app.routers.search import router as search_router
 from app.routers.member import invite_router
 from app.routers.activity import router as activity_router
+from app.routers.ai import router as ai_router
 
 
 app = FastAPI(
@@ -58,6 +59,7 @@ app.include_router(notification_router)
 app.include_router(search_router)
 app.include_router(invite_router)
 app.include_router(activity_router)
+app.include_router(ai_router)
 
 @app.get("/")
 def root():
