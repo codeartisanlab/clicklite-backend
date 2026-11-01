@@ -14,7 +14,8 @@ from app.routers.comment import get_owned_task
 from app.core.config import settings
 from app.core.dependencies import get_current_user
 from app.models.user import User
-from app.schemas.ai import TaskDraft, TaskSentence,CommentSummary,CommentSummaryRequest
+from app.routers.task import load_my_day
+from app.schemas.ai import TaskDraft, TaskSentence,CommentSummary,CommentSummaryRequest,DayPlan
 
 import ssl
 import certifi
@@ -156,3 +157,48 @@ def summarize_comments(
         )
 
     return CommentSummary(note=note)
+
+
+@router.post("/day", response_model=DayPlan)
+def plan_my_day(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    due_rows, progress_rows = load_my_day(db, current_user)
+    chosen = {}
+
+    for task, project in due_rows + progress_rows:
+        chosen[str(task.id)] = (task, project)
+
+    if not chosen:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Nothing is due or in progress",
+        )
+
+    lines = []
+
+    for task, project in chosen.values():
+        due = task.due_date.isoformat() if task.due_date else "no date"
+        lines.append(
+            f"{task.title} in {project.name}, status {task.status}, due {due}"
+        )
+
+    prompt = (
+        f"Today is {date.today().isoformat()}. "
+        "Write one short plan for these tasks. "
+        "Return only JSON with note. "
+        "The note must be one or two sentences.\n"
+        + "\n".join(lines)
+    )
+
+    parsed = ask_groq(prompt)
+    note = str(parsed.get("note") or "").strip()
+
+    if len(note) < 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="The AI reply had no note",
+        )
+
+    return DayPlan(note=note)

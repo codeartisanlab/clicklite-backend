@@ -22,3 +22,7 @@ class CommentSummaryRequest(BaseModel):
 
 class CommentSummary(BaseModel):
     note: str
+
+
+class DayPlan(BaseModel):
+    note: str

@@ -51,3 +51,17 @@ class TaskCalendarResponse(BaseModel):
     status: str
     project_id: str
     project_name: str
+
+
+class MyDayTask(BaseModel):
+    id: str
+    title: str
+    due_date: date | None
+    status: str
+    project_id: str
+    project_name: str
+
+
+class MyDayResponse(BaseModel):
+    due: list[MyDayTask]
+    in_progress: list[MyDayTask]

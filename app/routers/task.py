@@ -11,7 +11,7 @@ from app.models.task import Task
 from app.models.user import User
 from app.models.member import Member
 from app.models.workspace import Workspace
-from app.schemas.task import TaskCreate, TaskResponse, TaskUpdate,TaskCalendarResponse
+from app.schemas.task import TaskCreate, TaskResponse, TaskUpdate,TaskCalendarResponse,MyDayResponse,MyDayTask
 from app.models.comment import Comment
 from app.routers.notification import add_notification
 from app.routers.workspace import can_access_workspace
@@ -368,3 +368,66 @@ def delete_task(
 
     db.delete(task)
     db.commit()
+
+
+
+def load_my_day(db: Session, current_user: User):
+    access = or_(
+        Workspace.owner_id == current_user.id,
+        Workspace.id.in_(
+            db.query(Member.workspace_id).filter(
+                Member.user_id == current_user.id
+            )
+        ),
+    )
+
+    base = (
+        db.query(Task, Project)
+        .join(Project, Task.project_id == Project.id)
+        .join(Workspace, Project.workspace_id == Workspace.id)
+        .filter(access, Task.status != "done")
+    )
+
+    due_rows = (
+        base.filter(
+            Task.due_date.is_not(None),
+            Task.due_date <= date.today(),
+        )
+        .order_by(Task.due_date.asc())
+        .all()
+    )
+
+    progress_rows = (
+        base.filter(Task.status == "in_progress")
+        .order_by(Task.title.asc())
+        .all()
+    )
+
+    return due_rows, progress_rows
+
+
+# My Day Start
+def to_my_day_task(task: Task, project: Project) -> MyDayTask:
+    return MyDayTask(
+        id=str(task.id),
+        title=task.title,
+        due_date=task.due_date,
+        status=task.status,
+        project_id=str(project.id),
+        project_name=project.name,
+    )
+
+
+@calendar_router.get("/my-day", response_model=MyDayResponse)
+def get_my_day(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    due_rows, progress_rows = load_my_day(db, current_user)
+
+    return MyDayResponse(
+        due=[to_my_day_task(task, project) for task, project in due_rows],
+        in_progress=[
+            to_my_day_task(task, project) for task, project in progress_rows
+        ],
+    )
