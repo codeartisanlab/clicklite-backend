@@ -13,3 +13,12 @@ class TaskDraft(BaseModel):
     description: str | None = None
     priority: Literal["low", "medium", "high"] = "medium"
     due_date: date | None = None
+
+
+class CommentSummaryRequest(BaseModel):
+    project_id: str
+    task_id: str
+
+
+class CommentSummary(BaseModel):
+    note: str
