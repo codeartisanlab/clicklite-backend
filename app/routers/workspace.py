@@ -44,6 +44,31 @@ def can_access_workspace(db, workspace_id, user):
 
     return workspace
 
+
+def can_manage_workspace(db, workspace_id, user):
+    workspace = can_access_workspace(db, workspace_id, user)
+
+    if workspace is None:
+        return None
+
+    if workspace.owner_id == user.id:
+        return workspace
+
+    member = (
+        db.query(Member)
+        .filter(
+            Member.workspace_id == workspace.id,
+            Member.user_id == user.id,
+            Member.role == "admin",
+        )
+        .first()
+    )
+
+    if member is None:
+        return None
+
+    return workspace
+
 # Routes
 router = APIRouter(
     prefix="/api/workspaces",

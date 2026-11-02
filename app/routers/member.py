@@ -14,6 +14,7 @@ from app.core.email import send_invite_email
 from app.core.config import settings
 from datetime import timedelta,datetime,timezone
 from app.core.security import hash_reset_token,create_reset_token
+from app.routers.workspace import can_access_workspace,can_manage_workspace
 
 router = APIRouter(
     prefix="/api/workspaces",
@@ -29,14 +30,7 @@ def get_members(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    workspace = (
-        db.query(Workspace)
-        .filter(
-            Workspace.id == workspace_id,
-            Workspace.owner_id == current_user.id,
-        )
-        .first()
-    )
+    workspace = can_access_workspace(db, workspace_id, current_user)
 
     if not workspace:
         raise HTTPException(
@@ -85,14 +79,8 @@ def invite_member(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    workspace = (
-        db.query(Workspace)
-        .filter(
-            Workspace.id == workspace_id,
-            Workspace.owner_id == current_user.id,
-        )
-        .first()
-    )
+    workspace = can_manage_workspace(db, workspace_id, current_user)
+
 
     if not workspace:
         raise HTTPException(
@@ -102,7 +90,9 @@ def invite_member(
 
     email = data.email.strip().lower()
 
-    if email == current_user.email.strip().lower():
+    owner = db.query(User).filter(User.id == workspace.owner_id).first()
+
+    if email == owner.email.strip().lower():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="This user is already the owner",
