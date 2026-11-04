@@ -131,7 +131,7 @@ def login(data: LoginRequest, response: Response, db: Session = Depends(get_db))
         key="access_token",
         value=access_token,
         httponly=True,
-        samesite="lax",
+        samesite="none" if settings.COOKIE_SECURE else "lax",
         secure=settings.COOKIE_SECURE,
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         path="/",
@@ -144,7 +144,10 @@ def login(data: LoginRequest, response: Response, db: Session = Depends(get_db))
 @router.post("/logout")
 def logout(response: Response):
     response.delete_cookie(
-        key="access_token"
+        key="access_token",
+        path="/",
+        samesite="none" if settings.COOKIE_SECURE else "lax",
+        secure=settings.COOKIE_SECURE,
     )
 
     return {

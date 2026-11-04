@@ -15,6 +15,7 @@ from app.routers.search import router as search_router
 from app.routers.member import invite_router
 from app.routers.activity import router as activity_router
 from app.routers.ai import router as ai_router
+from app.core.config import settings
 
 
 app = FastAPI(
@@ -38,11 +39,17 @@ async def validation_exception_handler(
         content={"detail": f"{field}: {reason}"},
     )
 
+origins = [
+    "http://localhost:3000",
+    "https://clicklite-frontend.vercel.app",
+]
+
+if settings.FRONTEND_URL not in origins:
+    origins.append(settings.FRONTEND_URL)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000"
-    ],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
